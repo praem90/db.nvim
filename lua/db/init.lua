@@ -263,7 +263,7 @@ M.setup = function(opts)
     pattern = { '*.sql' },
     group = au,
     callback = function()
-      local lines = vim.api.nvim_buf_get_lines(M.query_split.bufnr, 0, -1, false)
+      local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
       M.run_query(lines)
     end,
   })
@@ -273,7 +273,7 @@ M.setup = function(opts)
     group = au,
     callback = function(args)
       vim.keymap.set('n', '<CR>', function()
-        local lines = vim.api.nvim_buf_get_lines(M.query_split.bufnr, 0, -1, false)
+        local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
         M.run_query(lines)
       end, { buffer = args.buf })
 
