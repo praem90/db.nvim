@@ -189,7 +189,6 @@ M.create_buffers = function()
       end
     end
     M.query_split.bufnr = M.query_split.bufnr or vim.api.nvim_create_buf(true, true)
-    vim.api.nvim_set_option_value('filetype', 'mysql', { buf = M.query_split.bufnr })
     vim.api.nvim_set_option_value('swapfile', false, { buf = M.query_split.bufnr })
     vim.api.nvim_set_option_value('buftype', '', { buf = M.query_split.bufnr })
     vim.api.nvim_buf_set_name(M.query_split.bufnr, M.query_split.filename)
@@ -209,25 +208,6 @@ M.create_buffers = function()
     vim.api.nvim_set_current_win(M.query_split.win)
     vim.api.nvim_set_current_buf(M.query_split.bufnr)
   end
-
-  vim.keymap.set('n', '<CR>', function()
-    local lines = vim.api.nvim_buf_get_lines(M.query_split.bufnr, 0, -1, false)
-    M.run_query(lines)
-  end)
-  local au = vim.api.nvim_create_augroup('mysql', {})
-  vim.api.nvim_create_autocmd('BufWritePost', {
-    pattern = { '*.sql' },
-    group = au,
-    callback = function()
-      local lines = vim.api.nvim_buf_get_lines(M.query_split.bufnr, 0, -1, false)
-      M.run_query(lines)
-    end,
-  })
-
-  vim.keymap.set('v', '<CR>', function()
-    local selected_lines = vim.fn.getregion(vim.fn.getpos 'v', vim.fn.getpos '.', { type = vim.fn.mode() })
-    M.run_query(selected_lines)
-  end)
 end
 
 M.run_query = function(lines)
@@ -276,6 +256,33 @@ end
 M.setup = function(opts)
   opts = opts or {}
   M.connections = opts.connections or {}
+
+  local au = vim.api.nvim_create_augroup('mysql', {})
+
+  vim.api.nvim_create_autocmd('BufWritePost', {
+    pattern = { '*.sql' },
+    group = au,
+    callback = function()
+      local lines = vim.api.nvim_buf_get_lines(M.query_split.bufnr, 0, -1, false)
+      M.run_query(lines)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd('BufEnter', {
+    pattern = { '*.sql' },
+    group = au,
+    callback = function(args)
+      vim.keymap.set('n', '<CR>', function()
+        local lines = vim.api.nvim_buf_get_lines(M.query_split.bufnr, 0, -1, false)
+        M.run_query(lines)
+      end, { buffer = args.buf })
+
+      vim.keymap.set('v', '<CR>', function()
+        local selected_lines = vim.fn.getregion(vim.fn.getpos 'v', vim.fn.getpos '.', { type = vim.fn.mode() })
+        M.run_query(selected_lines)
+      end, { buffer = args.buf })
+    end,
+  })
 end
 
 return M
