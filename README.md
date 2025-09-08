@@ -11,3 +11,17 @@ require'praem90/db.nvim'.setup({
     }
 })
 ```
+
+To connect to a database
+```lua
+require'praem90/db.nvim'.open()
+```
+
+Once connected the database, open any sql file and save it or enter in normal mode to run the query
+Select query in visual mode and then hit enter to run the query
+
+To list tables from the selected connection 
+```lua
+require'praem90/db.nvim'.open_tables()
+```
+
