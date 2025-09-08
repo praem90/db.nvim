@@ -5,7 +5,7 @@ A lua copy of [vim-dadbod](https://github.com/tpope/vim-dadbod) and [vim-dadbod-
 Currently support mysql
 
 ```lua
-require'praem90/db.nvim'.setup({
+require('db.nvim').setup({
     connections = {
         {name = 'Local', host = '127.0.0.1', port= 3306, user = 'root', password = 'pass', database = 'test'}
     }
@@ -14,7 +14,7 @@ require'praem90/db.nvim'.setup({
 
 To connect to a database
 ```lua
-require'praem90/db.nvim'.open()
+require('db.nvim').open()
 ```
 
 Once connected the database, open any sql file and save it or enter in normal mode to run the query
@@ -22,6 +22,6 @@ Select query in visual mode and then hit enter to run the query
 
 To list tables from the selected connection 
 ```lua
-require'praem90/db.nvim'.open_tables()
+require('db.nvim').open_tables()
 ```
 
