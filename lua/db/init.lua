@@ -285,4 +285,20 @@ M.setup = function(opts)
   })
 end
 
+M.connection_statusline = function()
+  if M.connId == nil then
+    return ''
+  end
+
+  return string.format('󱘖 %s', M.connId)
+end
+
+M.database_statusline = function()
+  if M.connId == nil then
+    return ''
+  end
+
+  return string.format('󰆼 %s', M.active_connections[M.connId].database)
+end
+
 return M
