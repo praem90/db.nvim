@@ -24,6 +24,8 @@ M.open = function(connId)
     M.push(item)
   end
 
+  vim.api.nvim_set_option_value('filetype', 'db.history', { buf = M.split.bufnr })
+  vim.api.nvim_buf_set_name(M.split.bufnr, 'db.history')
   vim.api.nvim_create_autocmd('WinClosed', {
     pattern = tostring(M.split.winid),
     callback = function()
