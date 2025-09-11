@@ -20,11 +20,11 @@ M.open = function(connId)
     table.insert(M.histories, vim.json.decode(line))
   end
 
-  for index, item in ipairs(M.histories) do
+  for _, item in ipairs(M.histories) do
     M.push(item)
   end
 
-  vim.api.nvim_set_option_value('filetype', 'db.history', { buf = M.split.bufnr })
+  vim.api.nvim_set_option_value('filetype', 'mysql', { buf = M.split.bufnr })
   vim.api.nvim_buf_set_name(M.split.bufnr, 'db.history')
   vim.api.nvim_create_autocmd('WinClosed', {
     pattern = tostring(M.split.winid),
@@ -35,8 +35,12 @@ M.open = function(connId)
 end
 
 M.add = function(connId, query)
+  if string.sub(query:gsub('%s+', ''), -1) ~= ';' then
+    query = query .. ';'
+  end
+
   local history = {
-    datetime = require('os').date(),
+    datetime = require('os').date '%d/%m %H:%M',
     query = query,
   }
   local history_file = utils.get_history_path(connId)
@@ -55,7 +59,7 @@ M.push = function(item)
   vim.api.nvim_buf_set_extmark(M.split.bufnr, ns, 0, 0, {
     virt_text_pos = 'right_align',
     virt_text = {
-      { item.datetime, 'LineNr' },
+      { ' ' .. item.datetime, 'LineNr' },
     },
   })
   vim.api.nvim_win_set_cursor(M.split.winid, { 1, 1 })
