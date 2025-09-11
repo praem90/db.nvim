@@ -6,6 +6,9 @@ local conf = require('telescope.config').values
 local actions = require 'telescope.actions'
 local action_state = require 'telescope.actions.state'
 
+local utils = require 'db.utils'
+local history = require 'db.history'
+
 local open_picker = function(records, opts)
   opts = opts or {}
   local picker_opts = require('telescope.themes').get_dropdown(opts.picker or {})
@@ -42,8 +45,14 @@ M.active_connections = {}
 
 M.connections = {}
 
-M.execute = function(opts, cb, onerr)
-  local args = { '-h', M.active_connections[M.connId].host, '--protocol', 'tcp', '--binary-as-hex', '-e', opts.sql }
+M.execute = function(sql, opts)
+  opts = opts or {}
+  if not vim.fn.executable 'mysql' and opts.error then
+    opts.error { 'Command `mysql` was not executable' }
+    return
+  end
+
+  local args = { '-h', M.active_connections[M.connId].host, '--protocol', 'tcp', '--binary-as-hex', '-e', sql }
   if M.active_connections[M.connId].database ~= nil then
     table.insert(args, '--database')
     table.insert(args, M.active_connections[M.connId].database)
@@ -71,17 +80,23 @@ M.execute = function(opts, cb, onerr)
     cwd = vim.fn.getcwd(),
     on_exit = function(j, return_val)
       if return_val == 0 then
-        cb(j:result())
-      else
-        onerr(j:stderr_result())
+        if opts.success then
+          opts.success(j:result())
+        end
+        return
+      end
+
+      if opts.error then
+        opts.error(j:stderr_result())
       end
     end,
   }):start()
+
+  history.add(M.connId, sql)
 end
 
 M.open = function(opts)
   opts = opts or {}
-  local pickers_opts = require('telescope.themes').get_dropdown(opts.picker or {})
   M.parent_win = vim.api.nvim_get_current_win()
 
   if #M.connections == 0 then
@@ -111,7 +126,7 @@ M.open = function(opts)
   })
 end
 
-M.pick_database = function(opts)
+M.pick_database = function()
   local callback = function(entry)
     M.active_connections[M.connId].database = entry[1]
     M.create_buffers()
@@ -122,13 +137,14 @@ M.pick_database = function(opts)
     return
   end
 
-  M.execute(
-    { sql = 'show databases;', columns = false, table = false },
-    vim.schedule_wrap(function(databases)
+  M.execute('show databases;', {
+    columns = false,
+    table = false,
+    success = vim.schedule_wrap(function(databases)
       M.active_connections[M.connId].databases = databases
       open_picker(databases, { callback = callback })
-    end)
-  )
+    end),
+  })
 end
 
 M.open_tables = function()
@@ -137,9 +153,10 @@ M.open_tables = function()
     return
   end
 
-  M.execute(
-    { sql = 'show tables', columns = false, table = false },
-    vim.schedule_wrap(function(tables)
+  M.execute('show tables', {
+    columns = false,
+    table = false,
+    success = vim.schedule_wrap(function(tables)
       M.active_connections[M.connId].tables = tables
       open_picker(tables, {
         callback = function(entry)
@@ -150,8 +167,8 @@ M.open_tables = function()
           end
         end,
       })
-    end)
-  )
+    end),
+  })
 end
 
 M.open_active_connections = function()
@@ -159,10 +176,11 @@ M.open_active_connections = function()
   local connections = {}
   for _, conn in pairs(M.active_connections) do
     count = count + 1
+    local entry = { name = conn.name, display = conn.name, ordinal = conn.name }
     if conn.name == M.connId then
-      conn.name = conn.name .. ' (active)'
+      entry.display = conn.name .. ' (active)'
     end
-    table.insert(connections, conn.name)
+    table.insert(connections, entry)
   end
   if count == 0 then
     vim.notify 'There are no active connections'
@@ -170,8 +188,15 @@ M.open_active_connections = function()
   end
 
   open_picker(connections, {
+    entry_maker = function(entry)
+      return {
+        value = entry,
+        display = entry.display,
+        ordinal = entry.name,
+      }
+    end,
     callback = function(entry)
-      M.connId = entry[1]
+      M.connId = entry.value.name
     end,
   })
 end
@@ -181,7 +206,7 @@ M.create_buffers = function()
     M.query_split = {
       bufnr = 0,
       win = M.parent_win,
-      filename = M.get_data_folder() .. M.connId:lower() .. '.sql',
+      filename = utils.get_data_path(utils.slug(M.connId:lower()) .. '.sql'),
     }
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
       if vim.api.nvim_buf_is_loaded(buf) and vim.api.nvim_buf_get_name(buf) == M.query_split.filename then
@@ -227,30 +252,23 @@ M.run_query = function(lines)
     win_options = {
       wrap = false,
     },
+    enter = false,
   }
 
-  M.execute(
-    { sql = table.concat(lines, '\n') },
-    vim.schedule_wrap(function(output)
+  M.execute(table.concat(lines, '\n'), {
+    success = vim.schedule_wrap(function(output)
       M.output_split:mount()
       vim.api.nvim_buf_set_lines(M.output_split.bufnr, 0, -1, false, output)
       vim.api.nvim_set_option_value('modified', false, { buf = M.output_split.bufnr })
     end),
-    vim.schedule_wrap(function(err)
+    error = vim.schedule_wrap(function(err)
       vim.print(vim.inspect(err))
-    end)
-  )
-end
-
-M.get_data_folder = function()
-  return vim.fn.stdpath 'data' .. '/mysql/'
+    end),
+  })
 end
 
 M.init = function()
-  local folder = M.get_data_folder()
-  if not vim.loop.fs_stat(folder) then
-    vim.fn.system { 'mkdir', folder }
-  end
+  utils.get_data_path()
 end
 
 M.setup = function(opts)
@@ -294,11 +312,15 @@ M.connection_statusline = function()
 end
 
 M.database_statusline = function()
-  if M.connId == nil then
+  if not M.connId or not M.active_connections[M.connId] then
     return ''
   end
 
   return string.format('󰆼 %s', M.active_connections[M.connId].database)
+end
+
+M.open_history = function()
+  history.open(M.connId)
 end
 
 return M

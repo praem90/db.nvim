@@ -24,4 +24,8 @@ To list tables from the selected connection
 ```lua
 require('db').open_tables()
 ```
+To show histories
+```lua
+require('db').open_history()
+```
 
