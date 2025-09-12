@@ -102,8 +102,8 @@ To list tables from the selected connection.
 ```lua
 require('db').open_tables()
 
--- `<CR>` to run the select query with limit 10
--- `<C-i>` to get the table information
+-- <CR> to run the select query with limit 10
+-- <C-i> in insert mode and `i` in normal mode to get the table information
 ```
 To show histories
 ```lua

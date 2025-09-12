@@ -29,12 +29,8 @@ local open_picker = function(records, opts)
           end
         end)
 
-        if opts.maps ~= nil then
-          for _, value in ipairs(opts.maps) do
-            map(value[1], value[2], function()
-              value[3](prompt_bufnr)
-            end, value[4] or {})
-          end
+        if opts.map ~= nil then
+          opts.map(map)
         end
         return true
       end,
@@ -178,17 +174,16 @@ M.open_tables = function()
             M.run_query(query)
           end
         end,
-        maps = {
-          {
-            'i',
-            '<C-i>',
-            vim.schedule_wrap(function(prompt_bufnr)
-              actions.close(prompt_bufnr)
-              local table = action_state.get_selected_entry()[1]
-              M.show_table_information(table)
-            end),
-          },
-        },
+        map = function(map)
+          local show_table_info = function(prompt_bufnr)
+            actions.close(prompt_bufnr)
+            local table = action_state.get_selected_entry()[1]
+            M.show_table_information(table)
+          end
+
+          map('i', '<C-i>', vim.schedule_wrap(show_table_info))
+          map('n', 'i', vim.schedule_wrap(show_table_info))
+        end,
       })
     end),
   })
@@ -207,13 +202,10 @@ M.show_table_information = function(table)
       split:mount()
       local header = {
         '+' .. string.rep('-', info[1]:len() - 2) .. '+',
-        '|' .. 'Table: ' .. table .. string.rep(' ', info[1]:len() - table:len() - 7 - 2) .. '|',
+        '|' .. ' Table: ' .. table .. string.rep(' ', info[1]:len() - table:len() - 8 - 2) .. '|',
       }
       vim.api.nvim_buf_set_lines(split.bufnr, 0, -1, false, header)
       vim.api.nvim_buf_set_lines(split.bufnr, -1, -1, false, info)
-    end),
-    error = vim.schedule_wrap(function(err)
-      vim.print(vim.inspect(err))
     end),
   })
 end
