@@ -20,7 +20,7 @@ local open_picker = function(records, opts)
         results = records,
         entry_maker = opts.entry_maker or nil,
       },
-      attach_mappings = function(prompt_bufnr)
+      attach_mappings = function(prompt_bufnr, map)
         actions.select_default:replace(function()
           actions.close(prompt_bufnr)
 
@@ -28,6 +28,14 @@ local open_picker = function(records, opts)
             opts.callback(action_state.get_selected_entry())
           end
         end)
+
+        if opts.maps ~= nil then
+          for _, value in ipairs(opts.maps) do
+            map(value[1], value[2], function()
+              value[3](prompt_bufnr)
+            end, value[4] or {})
+          end
+        end
         return true
       end,
       sorter = conf.generic_sorter(opts),
@@ -153,20 +161,57 @@ M.open_tables = function()
     return
   end
 
-  M.execute('show tables', {
+  M.execute('show tables;', {
     columns = false,
     table = false,
     success = vim.schedule_wrap(function(tables)
       M.active_connections[M.connId].tables = tables
       open_picker(tables, {
+        title = 'Tables',
         callback = function(entry)
           if M.query_split.bufnr and vim.api.nvim_buf_is_valid(M.query_split.bufnr) then
             local line_count = vim.api.nvim_buf_line_count(M.query_split.bufnr)
-            vim.api.nvim_buf_set_lines(M.query_split.bufnr, line_count, line_count, false, { 'select * from ' .. entry[1] .. ' limit 10;' })
-            vim.api.nvim_win_set_cursor(M.query_split.win, { line_count + 1, 1 })
+            local query = { 'select * from ' .. entry[1] .. ' limit 10;' }
+            vim.api.nvim_buf_set_lines(M.query_split.bufnr, line_count, line_count, false, query)
+            M.run_query(query)
           end
         end,
+        maps = {
+          {
+            'i',
+            '<C-i>',
+            vim.schedule_wrap(function(prompt_bufnr)
+              actions.close(prompt_bufnr)
+              local table = action_state.get_selected_entry()[1]
+              M.show_table_information(table)
+            end),
+          },
+        },
       })
+    end),
+  })
+end
+
+M.show_table_information = function(table)
+  local query = string.format(
+    'desc %s; select concat("└─ ", index_name, " (", column_name, ") using ", index_type, " ", if(non_unique=0, "UNIQUE", "")) as "Indexes:" from information_schema.statistics where table_name="%s" and table_schema="%s";',
+    table,
+    table,
+    M.active_connections[M.connId].database
+  )
+  M.execute(query, {
+    success = vim.schedule_wrap(function(info)
+      local split = Split {}
+      split:mount()
+      local header = {
+        '+' .. string.rep('-', info[1]:len() - 2) .. '+',
+        '|' .. 'Table: ' .. table .. string.rep(' ', info[1]:len() - table:len() - 7 - 2) .. '|',
+      }
+      vim.api.nvim_buf_set_lines(split.bufnr, 0, -1, false, header)
+      vim.api.nvim_buf_set_lines(split.bufnr, -1, -1, false, info)
+    end),
+    error = vim.schedule_wrap(function(err)
+      vim.print(vim.inspect(err))
     end),
   })
 end
