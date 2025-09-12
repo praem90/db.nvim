@@ -96,7 +96,9 @@ require('db').open()
 Once connected the database, open any sql file and save it or enter in normal mode to run the query
 Select query in visual mode and then hit enter to run the query
 
-To list tables from the selected connection 
+To list tables from the selected connection.
+Press `<CR>` to run the select query with limit 10;
+Press `<C-i>` to get the table information
 ```lua
 require('db').open_tables()
 ```
