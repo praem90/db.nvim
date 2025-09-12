@@ -53,6 +53,8 @@ M.active_connections = {}
 
 M.connections = {}
 
+M.use_icons = true
+
 M.execute = function(sql, opts)
   opts = opts or {}
   if not vim.fn.executable 'mysql' and opts.error then
@@ -320,6 +322,10 @@ M.setup = function(opts)
   opts = opts or {}
   M.connections = opts.connections or {}
 
+  if opts.use_icons ~= nil then
+    M.use_icons = opts.use_icons
+  end
+
   local au = vim.api.nvim_create_augroup('mysql', {})
 
   vim.api.nvim_create_autocmd('BufWritePost', {
@@ -353,7 +359,11 @@ M.connection_statusline = function()
     return ''
   end
 
-  return string.format('󱘖 %s', M.connId)
+  if M.use_icons then
+    return string.format('󱘖 %s', M.connId)
+  end
+
+  return M.connId
 end
 
 M.database_statusline = function()
@@ -361,7 +371,11 @@ M.database_statusline = function()
     return ''
   end
 
-  return string.format('󰆼 %s', M.active_connections[M.connId].database)
+  if M.use_icons then
+    return string.format('󰆼 %s', M.active_connections[M.connId].database)
+  end
+
+  return M.active_connections[M.connId].database
 end
 
 M.open_history = function()
