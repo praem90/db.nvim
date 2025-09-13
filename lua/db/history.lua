@@ -11,6 +11,12 @@ M.open = function(connId)
     position = 'left',
     size = '20%',
     enter = false,
+    buf_options = {
+      filetype = 'mysql',
+    },
+    win_options = {
+      linebreak = true,
+    },
   }
   M.split:mount()
 
@@ -24,11 +30,13 @@ M.open = function(connId)
     M.push(item)
   end
 
-  vim.api.nvim_set_option_value('filetype', 'mysql', { buf = M.split.bufnr })
   vim.api.nvim_buf_set_name(M.split.bufnr, 'db.history')
   vim.api.nvim_create_autocmd('WinClosed', {
     pattern = tostring(M.split.winid),
     callback = function()
+      if vim.api.nvim_buf_is_valid(M.split.bufnr) then
+        vim.api.nvim_buf_delete(M.split.bufnr, { force = true })
+      end
       M.split = nil
     end,
   })

@@ -72,8 +72,13 @@ M.execute = function(sql, opts)
     table.insert(args, '-u' .. M.active_connections[M.connId].user)
   end
 
-  if opts.table == nil or opts.table == true then
-    table.insert(args, '--table')
+  if opts.result_format ~= nil then
+    table.insert(args, '--result_format')
+    table.insert(args, opts.result_format)
+  else
+    if opts.table == nil or opts.table == true then
+      table.insert(args, '--table')
+    end
   end
 
   if opts.columns ~= nil and opts.columns == false then
@@ -191,6 +196,10 @@ end
 
 M.show_table_information = function(table)
   local query = string.format(
+    'select * from information_schema.tables where table_name = "%s" and table_schema = "%s";',
+    table,
+    M.active_connections[M.connId].database
+  ) .. string.format(
     'desc %s; select concat("└─ ", index_name, " (", column_name, ") using ", index_type, " ", if(non_unique=0, "UNIQUE", "")) as "Indexes:" from information_schema.statistics where table_name="%s" and table_schema="%s";',
     table,
     table,
