@@ -140,3 +140,12 @@ require('lualine').setup({
 })
 ```
 
+### Screenshots
+Schema tree and table information
+<img width="3008" height="1692" alt="schema-tree-with-table-information" src="https://github.com/user-attachments/assets/0be7d059-fffd-40c0-9a70-d4db8f9123b2" />
+
+Query history and result
+<img width="3008" height="1692" alt="history-with-query-result" src="https://github.com/user-attachments/assets/7e3f9a2e-acdb-4e73-aa6e-bf0d2815e853" />
+
+
+
