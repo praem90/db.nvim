@@ -130,6 +130,7 @@ M.open = function(opts)
 
       if selection.value.database ~= nil then
         M.create_buffers()
+        M.open_tables { dont_pick = true }
       else
         M.pick_database()
       end
@@ -141,6 +142,7 @@ M.pick_database = function()
   local callback = function(entry)
     M.active_connections[M.connId].database = entry[1]
     M.create_buffers()
+    M.open_tables { dont_pick = true }
   end
 
   if M.active_connections[M.connId].databases ~= nil then
@@ -158,7 +160,8 @@ M.pick_database = function()
   })
 end
 
-M.open_tables = function()
+M.open_tables = function(opts)
+  opts = opts or {}
   if M.connId == nil or M.active_connections[M.connId].database == nil then
     vim.notify 'Please connect to a server and a database'
     return
@@ -169,15 +172,13 @@ M.open_tables = function()
     table = false,
     success = vim.schedule_wrap(function(tables)
       M.active_connections[M.connId].tables = tables
+      if opts.dont_pick == true then
+        return
+      end
       open_picker(tables, {
         title = 'Tables',
         callback = function(entry)
-          if M.query_split.bufnr and vim.api.nvim_buf_is_valid(M.query_split.bufnr) then
-            local line_count = vim.api.nvim_buf_line_count(M.query_split.bufnr)
-            local query = { 'select * from ' .. entry[1] .. ' limit 10;' }
-            vim.api.nvim_buf_set_lines(M.query_split.bufnr, line_count, line_count, false, query)
-            M.run_query(query)
-          end
+          M.select_table(entry[1])
         end,
         map = function(map)
           local show_table_info = function(prompt_bufnr)
@@ -194,29 +195,26 @@ M.open_tables = function()
   })
 end
 
+M.select_table = function(table)
+  if M.query_split.bufnr and vim.api.nvim_buf_is_valid(M.query_split.bufnr) then
+    local query = { 'select * from ' .. table .. ' limit 10;' }
+    vim.api.nvim_buf_set_lines(M.query_split.bufnr, -1, -1, false, query)
+    M.run_query(query)
+  end
+end
+
 M.show_table_information = function(table)
-  local query = string.format(
-    'select * from information_schema.tables where table_name = "%s" and table_schema = "%s";',
-    table,
-    M.active_connections[M.connId].database
-  ) .. string.format(
-    'desc %s; select concat("└─ ", index_name, " (", column_name, ") using ", index_type, " ", if(non_unique=0, "UNIQUE", "")) as "Indexes:" from information_schema.statistics where table_name="%s" and table_schema="%s";',
-    table,
-    table,
-    M.active_connections[M.connId].database
-  )
-  M.execute(query, {
-    success = vim.schedule_wrap(function(info)
-      local split = Split {}
-      split:mount()
-      local header = {
-        '+' .. string.rep('-', info[1]:len() - 2) .. '+',
-        '|' .. ' Table: ' .. table .. string.rep(' ', info[1]:len() - table:len() - 8 - 2) .. '|',
-      }
-      vim.api.nvim_buf_set_lines(split.bufnr, 0, -1, false, header)
-      vim.api.nvim_buf_set_lines(split.bufnr, -1, -1, false, info)
-    end),
-  })
+  local query = {
+    string.format('desc %s;', table),
+    string.format(
+      'select concat("└─ ", index_name, " (", column_name, ") using ", index_type, " ", if(non_unique=0, "UNIQUE", "")) as "Indexes:" from information_schema.statistics where table_name="%s" and table_schema="%s";',
+      table,
+      M.active_connections[M.connId].database
+    ),
+    string.format('select * from information_schema.tables where table_name = "%s" and table_schema = "%s";', table, M.active_connections[M.connId].database),
+  }
+
+  M.run_query(query)
 end
 
 M.open_active_connections = function()
@@ -261,7 +259,9 @@ M.create_buffers = function()
         M.query_split.bufnr = buf
       end
     end
-    M.query_split.bufnr = M.query_split.bufnr or vim.api.nvim_create_buf(true, true)
+    if M.query_split.bufnr == 0 then
+      M.query_split.bufnr = vim.api.nvim_create_buf(true, true)
+    end
     vim.api.nvim_set_option_value('swapfile', false, { buf = M.query_split.bufnr })
     vim.api.nvim_set_option_value('buftype', '', { buf = M.query_split.bufnr })
     vim.api.nvim_buf_set_name(M.query_split.bufnr, M.query_split.filename)
@@ -294,7 +294,7 @@ M.run_query = function(lines)
   end
 
   M.output_split = Split {
-    relative = 'win',
+    relative = { type = 'win', winid = M.query_split.win },
     position = 'bottom',
     size = '20%',
     win_options = {
@@ -302,6 +302,10 @@ M.run_query = function(lines)
     },
     enter = false,
   }
+
+  M.output_split:map('n', 'q', function()
+    M.output_split:unmount()
+  end)
 
   M.execute(table.concat(lines, '\n'), {
     success = vim.schedule_wrap(function(output)
