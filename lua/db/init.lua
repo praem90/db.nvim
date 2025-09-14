@@ -205,7 +205,17 @@ end
 
 M.show_table_information = function(table)
   local query = {
-    string.format('desc %s;', table),
+    string.format(
+      'SELECT '
+        .. 'cols.COLUMN_NAME, cols.COLUMN_TYPE, cols.IS_NULLABLE, cols.COLUMN_KEY, cols.EXTRA, cols.COLUMN_DEFAULT, '
+        .. 'u.CONSTRAINT_NAME, u.COLUMN_NAME, CONCAT(u.REFERENCED_TABLE_NAME, ".", u.REFERENCED_COLUMN_NAME) as REFERENCE, c.UPDATE_RULE as ON_UPDATE, c.DELETE_RULE as ON_DELETE '
+        .. 'FROM INFORMATION_SCHEMA.COLUMNS cols '
+        .. 'LEFT JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE as u on u.TABLE_SCHEMA = cols.TABLE_SCHEMA and u.TABLE_NAME = cols.TABLE_NAME and u.COLUMN_NAME = cols.COLUMN_NAME '
+        .. 'LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS as c on c.CONSTRAINT_SCHEMA = cols.TABLE_SCHEMA and c.TABLE_NAME = cols.TABLE_NAME and c.CONSTRAINT_NAME = u.CONSTRAINT_NAME '
+        .. 'where cols.TABLE_SCHEMA="%s" and cols.TABLE_NAME = "%s";',
+      M.active_connections[M.connId].database,
+      table
+    ),
     string.format(
       'select concat("└─ ", index_name, " (", column_name, ") using ", index_type, " ", if(non_unique=0, "UNIQUE", "")) as "Indexes:" from information_schema.statistics where table_name="%s" and table_schema="%s";',
       table,
@@ -296,11 +306,10 @@ M.run_query = function(lines)
   M.output_split = Split {
     relative = { type = 'win', winid = M.query_split.win },
     position = 'bottom',
-    size = '20%',
+    size = 20,
     win_options = {
       wrap = false,
     },
-    enter = false,
   }
 
   M.output_split:map('n', 'q', function()
